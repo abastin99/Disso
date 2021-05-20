@@ -11,6 +11,7 @@ import pandas as pd
 from PIL import Image, ImageTk
 from collections import Counter
 from tkinter import *
+import prettytable
 from scapy.all import *
 from sklearn import tree
 from sklearn.tree import DecisionTreeClassifier, export_graphviz
@@ -109,19 +110,30 @@ def main():
         pass_data.loc[i] = [str(ip), count, countDict[ip]["Total_Bytes_Sent"], countDict[ip]["TCP"], countDict[ip]["HTTP_GET"], countDict[ip]["ICMP"]]
         i +=1
     print(results)  
-    #print(pass_data.head())
+
     result = [] 
     limited_data = pass_data[['Count', 'Total_Bytes_Sent','SYN Flood', 'HTTP_GET_Req', 'Pings_Sent']]
     loaded_model = pickle.load(open('RandomForestClassifier.sav', 'rb'))
     result = loaded_model.predict(limited_data)
-    #print(result[0])
-    #print(type(result))
 
+    #Loop to get Malicious traffic
+    malicious_ips = []
+    diagnosis = "no attack detected"
+    for x in range(len(result)):
+        if result[x] == 1:
+            malicious_ips.append(pass_data["IP"][x])
+    if len(malicious_ips) == 1:  
+        diagnosis = "DoS attack detected from " + str(malicious_ips[0])      
+    elif len(malicious_ips) > 1:
+        diagnosis = "DDoS attack detected from " + str(malicious_ips)
+    
+    print(diagnosis)    
     #printing out graph containing number of bytes over time
-    #Converting the list to a series and the timestamp list to a pd date_time
     bytes = pd.Series(pktBytes).astype(int)
+    #Converting the list to a series and the timestamp list to a pd date_time
     times = pd.to_datetime(pd.Series(pktTimes).astype(str), errors='coerce')
 
+    badTraffic = prettytable()
     #Create the dataframe
     df  = pd.DataFrame({"Bytes": bytes, "Times":times})
     #set the date from a range to an timestamp
