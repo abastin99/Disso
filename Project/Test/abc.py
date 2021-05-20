@@ -1,7 +1,6 @@
 from ipaddress import IPv4Address
 import pcapkit
 import os
-import shutil
 import pickle
 from pcapkit.utilities.validations import pkt_check 
 import plotly.graph_objects as go
@@ -48,9 +47,9 @@ def main():
 
     out = PrettyTable()
     out.field_names = ["No","Time","Source IP", "Destination IP", "Protocol"]
-
-    sIP = PrettyTable()
-    sIP.field_names = ["IP", "Count", "TCP Flag Issue"]
+    
+    tempTraffic = []
+    
     results = PrettyTable()
     results.field_names = ["IP", "Count", "Total_Bytes_Sent", "SYN Flood", "HTTP_GET_Req", "Pings_Sent"]
     #creating lists for all the source IP's, timestamps, and number of bytes
@@ -77,6 +76,7 @@ def main():
             destinationIP = frameInfo.dst
             protocolUsed = frameInfo.protocol
             out.add_row([x+1,time,sourceIP,destinationIP,protocolUsed])
+            tempTraffic.append([x+1,time,sourceIP,destinationIP,protocolUsed])
             #adding the source IP, frame time and frame length to their respective lists
             srcIP.append(sourceIP)
             pktTimes.append(time)
@@ -127,13 +127,24 @@ def main():
     elif len(malicious_ips) > 1:
         diagnosis = "DDoS attack detected from " + str(malicious_ips)
     
-    print(diagnosis)    
+    print(diagnosis)  
+    
+    bad_traffic = PrettyTable()
+    bad_traffic.field_names =["No","Time","Source IP", "Destination IP", "Protocol"]
+    if len(malicious_ips) > 0:
+        for x in range(len(tempTraffic)):
+            sIP = str(tempTraffic[x][2])
+            dIP = str(tempTraffic[x][3])
+            if sIP in malicious_ips or dIP in malicious_ips:
+                bad_traffic.add_row(tempTraffic[x])
+    else:
+        bad_traffic = out        
+        
+      
     #printing out graph containing number of bytes over time
     bytes = pd.Series(pktBytes).astype(int)
     #Converting the list to a series and the timestamp list to a pd date_time
     times = pd.to_datetime(pd.Series(pktTimes).astype(str), errors='coerce')
-
-    badTraffic = prettytable()
     #Create the dataframe
     df  = pd.DataFrame({"Bytes": bytes, "Times":times})
     #set the date from a range to an timestamp
@@ -168,7 +179,7 @@ def main():
     text_area.grid(column = 0, pady = 10, padx = 10)
     
     # Inserting Text which is read only
-    text_area.insert(tk.INSERT,out)
+    text_area.insert(tk.INSERT,bad_traffic)
     
     # Making the text read only
     text_area.configure(state ='disabled')
@@ -181,7 +192,6 @@ def main():
     def export_graph():
         #downloadTo = ""
         print("Button clicked")
-        #shutil.copy(img,"Downloads")
         if os.path.exists("temp/test.png"):
             os.rename("temp/test.png", "C:/Users/andre/Downloads/exportedGraph.png")
     
