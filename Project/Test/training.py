@@ -5,19 +5,18 @@ from pcapkit.utilities.validations import pkt_check
 from collections import Counter, defaultdict
 from prettytable import PrettyTable
 
-relativePath = 'Project\\resources\\Training Data\\icmp-flood-0.pcap' # Relative directory something like '../test.pcap'
+relativePath = 'Project\\resources\\Training Data\\http-flood.pcap' # Relative directory something like '../test.pcap'
 fullPath = os.path.join(os.getcwd(),relativePath) # gets the fullpath of the file by con current working directory to 
 extraction = pcapkit.extract(fin=fullPath, nofile=True) 
 totalFrames = len(extraction.frame) 
-print(totalFrames)
 
 results = PrettyTable()
-results.field_names = ["IP", "Count", "Total_Bytes_Sent", "SYN Flood", "HTTP_GET_Req", "Malicious"] #, "Pings per Second", "Slowloris"]
+results.field_names = ["IP", "Count", "Total_Bytes_Sent", "SYN Flood", "HTTP_GET_Req", "Pings_Sent", "Malicious"] #, "Pings per Second", "Slowloris"]
 
 #creating lists for all the source IP's
 srcIP = []
 
-cntbadSYN = Counter()
+
 countDict = defaultdict(lambda: defaultdict(lambda: 0))
 finalTime = 0
 # check if IP in this frame, otherwise don't print
@@ -38,13 +37,11 @@ for x in range(totalFrames):
         destinationIP = frameInfo.dst
         protocolUsed = frameInfo.protocol
         headerinfo = frameInfo.info.packet.header
-        bytes.decode(headerinfo, encoding="latin1")
         print (headerinfo)
         countDict[sourceIP]["Total_Bytes_Sent"] += length
         #adding various items to their respective lists
         srcIP.append(sourceIP) 
         if protocolUsed == 1: #1 --> ICMP protocol
-            #if 'b\'\\x00\\x05\\xac\x18' in headerinfo:
                 countDict[sourceIP]["ICMP"] += 1
         if protocolUsed == 6: #6 --> TCP protocol
             #get flags for HTTP GET flood
@@ -66,7 +63,7 @@ cntIP = Counter()
 for ip in srcIP:
     cntIP[ip] += 1          
 for ip, count in cntIP.most_common():
-    results.add_row([ip, count, countDict[ip]["Total_Bytes_Sent"], countDict[ip]["TCP"], countDict[ip]["HTTP_GET"], 0]) #, countDict[ip]["ICMP"], countDict[ip]["Slowloris"]])        
+    results.add_row([ip, count, countDict[ip]["Total_Bytes_Sent"], countDict[ip]["TCP"], countDict[ip]["HTTP_GET"], countDict[ip]["ICMP"], 0]) #, countDict[ip]["ICMP"], countDict[ip]["Slowloris"]])        
 print(results)  
 
 result = []

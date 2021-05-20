@@ -1,6 +1,8 @@
+from ipaddress import IPv4Address
 import pcapkit
 import os
 import shutil
+import pickle
 from pcapkit.utilities.validations import pkt_check 
 import plotly.graph_objects as go
 import tkinter as tk
@@ -18,19 +20,18 @@ from prettytable import PrettyTable
 
 def on_closing():
     if os.path.exists("temp/test.png"):
-        os.remove("temp/test.png")
-    main()
+        os.remove("temp/test.png") 
 
 def main():
     while True:
         try:
-            user_input = input("Enter PCAP filename or Q to quit: ") #get filename #http-syn-fllod-25-20
+            user_input = input("Enter PCAP filename or Q to quit: ") #get filename e.g.http-syn-fllod-25-20
             if user_input == "Q" or user_input == "q":
                 exit()
             if user_input == "":
                 print("This input invaild, please re-enter")
                 continue  
-            if not os.path.exists("Project\\resources\\Training Data\\" + user_input + ".pcap"):
+            if not os.path.exists("Project\\resources\\Testing Data\\" + user_input + ".pcap"):
                 print("invaild input or file doesn't exist, please try again")
                 continue    
         except ValueError:
@@ -39,7 +40,7 @@ def main():
         else:
             break
     
-    relativePath = 'Project\\resources\\Training Data\\' + user_input + '.pcap' # Relative directory something like '../test.pcap'
+    relativePath = 'Project\\resources\\Testing Data\\' + user_input + '.pcap' # Relative directory something like '../test.pcap'
     fullPath = os.path.join(os.getcwd(),relativePath) # gets the fullpath of the file by con current working directory to 
     extraction = pcapkit.extract(fin=fullPath, nofile=True) 
     totalFrames = len(extraction.frame) 
@@ -49,13 +50,13 @@ def main():
 
     sIP = PrettyTable()
     sIP.field_names = ["IP", "Count", "TCP Flag Issue"]
-
+    results = PrettyTable()
+    results.field_names = ["IP", "Count", "Total_Bytes_Sent", "SYN Flood", "HTTP_GET_Req", "Pings_Sent"]
     #creating lists for all the source IP's, timestamps, and number of bytes
     srcIP = []
     pktTimes = []
     pktBytes = []
 
-    cntbadSYN = Counter()
     countDict = defaultdict(lambda: defaultdict(lambda: 0)) 
     
     # check if IP in this frame, otherwise don't print
@@ -75,27 +76,46 @@ def main():
             destinationIP = frameInfo.dst
             protocolUsed = frameInfo.protocol
             out.add_row([x+1,time,sourceIP,destinationIP,protocolUsed])
-            #adding various items to their respective lists
+            #adding the source IP, frame time and frame length to their respective lists
             srcIP.append(sourceIP)
             pktTimes.append(time)
             pktBytes.append(length)
-            #SYN Flood CONDITIONS 
+            if protocolUsed == 1: #1 --> ICMP protocol
+                    countDict[sourceIP]["ICMP"] += 1
             if protocolUsed == 6: #6 --> TCP protocol
+                #get flags for HTTP GET flood
+                getFlag = frameInfo.info.packet.payload
+                getFlag = str(getFlag)
+                #get flags for SYN flood condition
                 synFlag = frameInfo.info.tcp.flags.syn
                 ackFlag = frameInfo.info.tcp.flags.ack
                 ackNo = frameInfo.info.tcp.ack
+                #SYN Flood CONDITIONS
                 if synFlag == True and ackFlag == False and ackNo != 0:
-                    countDict[sourceIP]["TCP"] += 1      
+                    countDict[sourceIP]["TCP"] += 1 
+                #HTTP GET Flood CONDITIONS    
+                if "GET / HTTP" in getFlag:
+                    countDict[sourceIP]["HTTP_GET"] += 1    
                 
-    print(countDict)
 
     #Getting the no. of occurrences of each individual source IP
     cntIP = Counter()
+    i = 0
+    pass_data = pd.DataFrame(columns=["IP", "Count", "Total_Bytes_Sent", "SYN Flood", "HTTP_GET_Req", "Pings_Sent"])
     for ip in srcIP:
         cntIP[ip] += 1          
     for ip, count in cntIP.most_common():
-        sIP.add_row([ip, count, countDict[ip]["TCP"]])        
-    print(sIP)  
+        results.add_row([ip, count, countDict[ip]["Total_Bytes_Sent"], countDict[ip]["TCP"], countDict[ip]["HTTP_GET"], countDict[ip]["ICMP"]]) #countDict[ip]["Slowloris"]])        
+        pass_data.loc[i] = [str(ip), count, countDict[ip]["Total_Bytes_Sent"], countDict[ip]["TCP"], countDict[ip]["HTTP_GET"], countDict[ip]["ICMP"]]
+        i +=1
+    print(results)  
+    #print(pass_data.head())
+    result = [] 
+    limited_data = pass_data[['Count', 'Total_Bytes_Sent','SYN Flood', 'HTTP_GET_Req', 'Pings_Sent']]
+    loaded_model = pickle.load(open('RandomForestClassifier.sav', 'rb'))
+    result = loaded_model.predict(limited_data)
+    #print(result[0])
+    #print(type(result))
 
     #printing out graph containing number of bytes over time
     #Converting the list to a series and the timestamp list to a pd date_time
@@ -146,16 +166,18 @@ def main():
     expTable = tk.Button(window,text="Export Table") #button to export table contents
     expTable.place(x=350, y=550)
     
-    expGraph = tk.Button(window,text="Export Graph")#button to export graph showing bytes over time, command=export_graph())
-    expGraph.place(x=1050, y=550)
-
-    #def export_graph():
+    def export_graph():
         #downloadTo = ""
+        print("Button clicked")
         #shutil.copy(img,"Downloads")
+        if os.path.exists("temp/test.png"):
+            os.rename("temp/test.png", "C:/Users/andre/Downloads/exportedGraph.png")
     
+    expGraph = tk.Button(window,text="Export Graph", command=export_graph)#button to export graph showing bytes over time, command=export_graph())
+    expGraph.place(x=1050, y=550)
+ 
     window.protocol("WM_DELETE_WINDOWS", on_closing)
     window.mainloop()
-
-  
-      
+   
 main()        
+
