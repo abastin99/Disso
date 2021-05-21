@@ -1,16 +1,18 @@
-from ipaddress import IPv4Address
 import pcapkit
 import os
+import csv
+import prettytable
+import datetime
 import pickle
-from pcapkit.utilities.validations import pkt_check 
 import plotly.graph_objects as go
 import tkinter as tk
 import tkinter.scrolledtext as st
 import pandas as pd
+from pcapkit.utilities.validations import pkt_check 
 from PIL import Image, ImageTk
+from ipaddress import IPv4Address
 from collections import Counter
 from tkinter import *
-import prettytable
 from scapy.all import *
 from sklearn import tree
 from sklearn.tree import DecisionTreeClassifier, export_graphviz
@@ -23,6 +25,7 @@ def on_closing():
         os.remove("temp/test.png") 
 
 def main():
+    
     while True:
         try:
             user_input = input("Enter PCAP filename or Q to quit: ") #get filename e.g.http-syn-fllod-25-20
@@ -138,9 +141,8 @@ def main():
             if sIP in malicious_ips or dIP in malicious_ips:
                 bad_traffic.add_row(tempTraffic[x])
     else:
-        bad_traffic = out        
-        
-      
+        bad_traffic = out       
+              
     #printing out graph containing number of bytes over time
     bytes = pd.Series(pktBytes).astype(int)
     #Converting the list to a series and the timestamp list to a pd date_time
@@ -168,7 +170,11 @@ def main():
     window.title('Results')
     window.geometry("1550x600+0+0")
 
+    #load in image of generated graph
     img = PhotoImage(file="temp/test.png")
+    #label containng the diagnosis for the file
+    res = tk.Label(window, text = "Diagnosis: " + diagnosis)
+    res.place(x=15, y=0)
 
     text_area = st.ScrolledText(window,
                                 width = 79, 
@@ -176,7 +182,7 @@ def main():
                                 font = ("Courier",
                                         11))
     
-    text_area.grid(column = 0, pady = 10, padx = 10)
+    text_area.grid(column = 0, pady = 20, padx = 10)
     
     # Inserting Text which is read only
     text_area.insert(tk.INSERT,bad_traffic)
@@ -184,18 +190,38 @@ def main():
     # Making the text read only
     text_area.configure(state ='disabled')
 
-    label = tk.Label(window,image= img)
-    label.place(x= 750, y= 10)
-    expTable = tk.Button(window,text="Export Table") #button to export table contents
+    pic = tk.Label(window,image= img)
+    pic.place(x= 750, y= 10)
+    
+    def export_table():
+        print("Button clicked")
+        
+        traffic_table = []
+        for line in str(results).splitlines():
+            splitdata = line.split("|")
+            if len(splitdata) == 1:
+                continue  # skip lines with no separators
+            linedata = []
+            for field in splitdata:
+                field = field.strip()
+                if field:
+                    linedata.append(field)
+            traffic_table.append(linedata)
+
+        with open('Exported_Data/traffic_data.csv', 'w', newline='') as outcsv:
+            writer = csv.writer(outcsv)
+            writer.writerows(traffic_table)
+    
+    expTable = tk.Button(window,text="Export Table", command=export_table) #button to export table contents
     expTable.place(x=350, y=550)
     
     def export_graph():
-        #downloadTo = ""
-        print("Button clicked")
+        if os.path.exists("Exported_Data/exportedGraph.png"):
+            os.remove("Exported_Data/exportedGraph.png")
         if os.path.exists("temp/test.png"):
-            os.rename("temp/test.png", "C:/Users/andre/Downloads/exportedGraph.png")
+            os.rename("temp/test.png", "Exported_Data/exportedGraph.png")
     
-    expGraph = tk.Button(window,text="Export Graph", command=export_graph)#button to export graph showing bytes over time, command=export_graph())
+    expGraph = tk.Button(window,text="Export Graph", command=export_graph)#button to export graph showing bytes over time
     expGraph.place(x=1050, y=550)
  
     window.protocol("WM_DELETE_WINDOWS", on_closing)

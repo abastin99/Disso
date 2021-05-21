@@ -11,12 +11,10 @@ extraction = pcapkit.extract(fin=fullPath, nofile=True)
 totalFrames = len(extraction.frame) 
 
 results = PrettyTable()
-results.field_names = ["IP", "Count", "Total_Bytes_Sent", "SYN Flood", "HTTP_GET_Req", "Pings_Sent", "Malicious"] #, "Pings per Second", "Slowloris"]
-
+results.field_names = ["IP", "Count", "Total_Bytes_Sent", "SYN Flood", "HTTP_GET_Req", "Pings_Sent", "Malicious"] 
 #creating lists for all the source IP's
 srcIP = []
-
-
+#initialisiing a nested dictionary to hold all the values collected for
 countDict = defaultdict(lambda: defaultdict(lambda: 0))
 finalTime = 0
 # check if IP in this frame, otherwise don't print
@@ -36,8 +34,6 @@ for x in range(totalFrames):
         sourceIP = frameInfo.src
         destinationIP = frameInfo.dst
         protocolUsed = frameInfo.protocol
-        headerinfo = frameInfo.info.packet.header
-        print (headerinfo)
         countDict[sourceIP]["Total_Bytes_Sent"] += length
         #adding various items to their respective lists
         srcIP.append(sourceIP) 
